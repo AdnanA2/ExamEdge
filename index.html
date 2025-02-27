@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple PDF to Anki Converter</title>
+    <style>
+        /* Basic styling */
+        body {
+            font-family: Arial;
+            background-color: white;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .main-container {
+            width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #cccccc;
+            background-color: #f8f8f8;
+        }
+        
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+        }
+        
+        .header h1 {
+            color: #333333;
+            font-size: 24px;
+        }
+        
+        .form-container {
+            margin-bottom: 20px;
+        }
+        
+        .form-row {
+            margin-bottom: 15px;
+        }
+        
+        .form-row label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .form-row input[type="file"] {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #cccccc;
+        }
+        
+        .form-row input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #cccccc;
+            box-sizing: border-box;
+        }
+        
+        .submit-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        
+        .submit-button:hover {
+            background-color: #45a049;
+        }
+        
+        .output-container {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .output-container h2 {
+            margin-bottom: 10px;
+            color: #333333;
+        }
+        
+        .content-display {
+            width: 100%;
+            height: 300px;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #cccccc;
+            font-family: Arial;
+            overflow: auto;
+        }
+        
+        .qa-display {
+            margin-top: 20px;
+        }
+        
+        .qa-pair {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            background-color: white;
+        }
+        
+        .question {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .answer {
+            margin-top: 5px;
+            padding-left: 15px;
+        }
+        
+        .instructions {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #ffffd0;
+            border: 1px solid #e0e0a0;
+        }
+        
+        .processing-message {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            font-weight: bold;
+            color: #0066cc;
+        }
+        
+        .error-message {
+            display: none;
+            text-align: center;
+            padding: 10px;
+            font-weight: bold;
+            color: red;
+            background-color: #ffeeee;
+            border: 1px solid #ffcccc;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Main container for the application -->
+    <div class="main-container">
+        <!-- Header section -->
+        <div class="header">
+            <h1>Simple PDF to Anki Converter</h1>
+            <p>Upload your PDF and extract content to create flashcards</p>
+        </div>
+        
+        <!-- Form container -->
+        <div class="form-container">
+            <form id="pdf-upload-form">
+                <!-- File input for PDF -->
+                <div class="form-row">
+                    <label for="pdf-file-input">Select PDF File:</label>
+                    <input type="file" id="pdf-file-input" accept=".pdf" required>
+                </div>
+                
+                <!-- Text input for deck name -->
+                <div class="form-row">
+                    <label for="deck-name-input">Enter Deck Name:</label>
+                    <input type="text" id="deck-name-input" placeholder="My Study Deck">
+                </div>
+                
+                <!-- Submit button -->
+                <div class="form-row">
+                    <button type="submit" class="submit-button">Extract Content from PDF</button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Processing message -->
+        <div id="processing-message" class="processing-message">
+            Processing your PDF... Please wait, this may take a few moments.
+        </div>
+        
+        <!-- Error message -->
+        <div id="error-message" class="error-message">
+            Error processing PDF. Please try again with a different file.
+        </div>
+        
+        <!-- Output container (hidden initially) -->
+        <div id="output-container" class="output-container">
+            <h2>Extracted Content:</h2>
+            
+            <!-- Raw text content display -->
+            <div id="content-display" class="content-display"></div>
+            
+            <!-- Basic Q&A generation section -->
+            <div class="form-row" style="margin-top: 15px;">
+                <button id="generate-qa-button" class="submit-button">Generate Basic Q&A Pairs</button>
+            </div>
+            
+            <!-- Q&A display section -->
+            <div id="qa-display" class="qa-display"></div>
+            
+            <!-- Instructions for next steps -->
+            <div class="instructions">
+                <h3>How to create your Anki deck:</h3>
+                <ol>
+                    <li>Copy the generated Q&A pairs</li>
+                    <li>Open Anki on your computer</li>
+                    <li>Create a new deck with the name you specified</li>
+                    <li>Add each question/answer as a new card</li>
+                    <li>Alternatively, you can export these as a CSV and import into Anki</li>
+                </ol>
+                <p><strong>Note:</strong> For more advanced features, you would need a server-side application that can directly generate Anki deck files.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Include PDF.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script>
+        // Set worker path for PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
+        
+        // Get HTML elements by their ID
+        var pdfForm = document.getElementById('pdf-upload-form');
+        var pdfFileInput = document.getElementById('pdf-file-input');
+        var deckNameInput = document.getElementById('deck-name-input');
+        var processingMessage = document.getElementById('processing-message');
+        var errorMessage = document.getElementById('error-message');
+        var outputContainer = document.getElementById('output-container');
+        var contentDisplay = document.getElementById('content-display');
+        var qaDisplay = document.getElementById('qa-display');
+        var generateQAButton = document.getElementById('generate-qa-button');
+        
+        // Store extracted text globally
+        var extractedText = '';
+        
+        // Function to show processing message
+        function showProcessingMessage() {
+            processingMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+            outputContainer.style.display = 'none';
+        }
+        
+        // Function to show error message
+        function showErrorMessage() {
+            processingMessage.style.display = 'none';
+            errorMessage.style.display = 'block';
+            outputContainer.style.display = 'none';
+        }
+        
+        // Function to show output
+        function showOutput() {
+            processingMessage.style.display = 'none';
+            errorMessage.style.display = 'none';
+            outputContainer.style.display = 'block';
+        }
+        
+        // Handle form submission
+        pdfForm.addEventListener('submit', function(event) {
+            // Prevent the default form submission
+            event.preventDefault();
+            
+            // Get the selected file
+            var file = pdfFileInput.files[0];
+            
+            // Check if a file is selected
+            if (!file) {
+                alert('Please select a PDF file');
+                return;
+            }
+            
+            // Check if the file is a PDF
+            if (file.type !== 'application/pdf') {
+                alert('Please select a PDF file');
+                return;
+            }
+            
+            // Show processing message
+            showProcessingMessage();
+            
+            // Create a file reader
+            var reader = new FileReader();
+            
+            // Define what happens when the file is loaded
+            reader.onload = function(event) {
+                // Get the file data
+                var typedArray = new Uint8Array(event.target.result);
+                
+                // Load the PDF document
+                pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
+                    // Initialize an empty string to hold all text
+                    extractedText = '';
+                    
+                    // Get the number of pages
+                    var numPages = pdf.numPages;
+                    var pagesProcessed = 0;
+                    
+                    // Process each page
+                    for (var i = 1; i <= numPages; i++) {
+                        pdf.getPage(i).then(function(page) {
+                            // Get the page number
+                            var pageNumber = page.pageNumber;
+                            
+                            // Get the text content of the page
+                            page.getTextContent().then(function(textContent) {
+                                // Extract text from the page
+                                var pageText = '';
+                                for (var j = 0; j < textContent.items.length; j++) {
+                                    pageText += textContent.items[j].str + ' ';
+                                }
+                                
+                                // Add page number and text to the extracted text
+                                extractedText += 'Page ' + pageNumber + ':\n' + pageText + '\n\n';
+                                
+                                // Increment the page counter
+                                pagesProcessed++;
+                                
+                                // Check if all pages have been processed
+                                if (pagesProcessed === numPages) {
+                                    // Display the extracted text
+                                    contentDisplay.textContent = extractedText;
+                                    
+                                    // Show the output
+                                    showOutput();
+                                }
+                            }).catch(function(error) {
+                                console.error('Error getting text content:', error);
+                                showErrorMessage();
+                            });
+                        }).catch(function(error) {
+                            console.error('Error getting page:', error);
+                            showErrorMessage();
+                        });
+                    }
+                }).catch(function(error) {
+                    console.error('Error loading PDF:', error);
+                    showErrorMessage();
+                });
+            };
+            
+            // Handle read errors
+            reader.onerror = function(error) {
+                console.error('Error reading file:', error);
+                showErrorMessage();
+            };
+            
+            // Read the file as an array buffer
+            reader.readAsArrayBuffer(file);
+        });
+        
+        // Handle generate Q&A button click
+        generateQAButton.addEventListener('click', function() {
+            // Check if there is extracted text
+            if (!extractedText) {
+                alert('Please extract content from a PDF first');
+                return;
+            }
+            
+            // Clear the Q&A display
+            qaDisplay.innerHTML = '';
+            
+            // Simple algorithm to generate basic Q&A pairs
+            // Split text into paragraphs
+            var paragraphs = extractedText.split('\n\n');
+            
+            // Process each non-empty paragraph
+            var qaPairs = [];
+            for (var i = 0; i < paragraphs.length; i++) {
+                var paragraph = paragraphs[i].trim();
+                
+                // Skip empty paragraphs and page headers
+                if (paragraph === '' || paragraph.startsWith('Page ')) {
+                    continue;
+                }
+                
+                // Split paragraph into sentences
+                var sentences = paragraph.split(/[.!?]+/).filter(function(sentence) {
+                    return sentence.trim().length > 30; // Only consider sentences with some content
+                });
+                
+                // Process sentences
+                for (var j = 0; j < sentences.length; j++) {
+                    var sentence = sentences[j].trim();
+                    
+                    // Skip short sentences
+                    if (sentence.length < 40) {
+                        continue;
+                    }
+                    
+                    // Create a simple question
+                    // Look for key terms
+                    var words = sentence.split(' ');
+                    
+                    // Find a candidate word for the question (nouns or technical terms)
+                    var candidateWords = [];
+                    for (var k = 0; k < words.length; k++) {
+                        var word = words[k].trim().replace(/[,.;:()]/g, '');
+                        if (word.length > 5 && /^[A-Z]/.test(word)) { // Capitalize words might be important
+                            candidateWords.push(word);
+                        }
+                    }
+                    
+                    // If we found potential keywords
+                    if (candidateWords.length > 0) {
+                        // Pick a random candidate
+                        var targetWord = candidateWords[Math.floor(Math.random() * candidateWords.length)];
+                        
+                        // Create a basic question
+                        var question;
+                        var randomType = Math.floor(Math.random() * 3);
+                        
+                        if (randomType === 0) {
+                            question = "What is " + targetWord + "?";
+                        } else if (randomType === 1) {
+                            question = "Explain the concept of " + targetWord + ".";
+                        } else {
+                            question = "Define " + targetWord + ".";
+                        }
+                        
+                        // Create Q&A pair
+                        qaPairs.push({
+                            question: question,
+                            answer: sentence
+                        });
+                        
+                        // Limit to a reasonable number
+                        if (qaPairs.length >= 10) {
+                            break;
+                        }
+                    }
+                }
+                
+                // Break if we have enough pairs
+                if (qaPairs.length >= 10) {
+                    break;
+                }
+            }
+            
+            // If we didn't generate enough Q&A pairs, add some generic ones
+            if (qaPairs.length < 5) {
+                var paragraphsToUse = paragraphs.filter(function(p) {
+                    return p.trim().length > 100 && !p.startsWith('Page ');
+                }).slice(0, 5);
+                
+                for (var i = 0; i < paragraphsToUse.length; i++) {
+                    var paragraph = paragraphsToUse[i].trim();
+                    qaPairs.push({
+                        question: "What does the text say about this topic?",
+                        answer: paragraph
+                    });
+                }
+            }
+            
+            // Display the Q&A pairs
+            for (var i = 0; i < qaPairs.length; i++) {
+                var pair = qaPairs[i];
+                
+                // Create a div for the Q&A pair
+                var pairDiv = document.createElement('div');
+                pairDiv.className = 'qa-pair';
+                
+                // Add the question
+                var questionDiv = document.createElement('div');
+                questionDiv.className = 'question';
+                questionDiv.textContent = 'Q: ' + pair.question;
+                pairDiv.appendChild(questionDiv);
+                
+                // Add the answer
+                var answerDiv = document.createElement('div');
+                answerDiv.className = 'answer';
+                answerDiv.textContent = 'A: ' + pair.answer;
+                pairDiv.appendChild(answerDiv);
+                
+                // Add the pair to the display
+                qaDisplay.appendChild(pairDiv);
+            }
+            
+            // Scroll to the Q&A display
+            qaDisplay.scrollIntoView({ behavior: 'smooth' });
+        });
+    </script>
+</body>
+</html>
